@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OKX BTC 무기한 차트</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root { --bg:#d1d4dc; --ink:#0b0b0d; --dim:#4b505c; --orange:#f58b0a; --dark:#1c1c1e; --dark2:#2c2c2e; }
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+html, body { height:100%; margin:0; }
+body { background:var(--dark); color:var(--ink); display:flex; flex-direction:column;
+font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; }
+header { background:var(--bg); padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 6px; }
+.top { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--dim); }
+#status { display:flex; align-items:center; gap:6px; }
+#status i { width:8px; height:8px; border-radius:50%; background:#8b909c; display:inline-block; }
+#status.live i { background:#1faa59; }
+.price { font-variant-numeric:tabular-nums; font-size:26px; font-weight:700; line-height:1.2; }
+.sub { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-height:16px; }
+#chart { flex:1; min-height:0; position:relative; background:var(--bg); touch-action:none; }
+#err { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--dim); line-height:1.6; z-index:5; }
+nav { background:var(--dark); display:flex; align-items:center; gap:8px; padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); }
+.tfs { display:flex; gap:6px; overflow-x:auto; flex:1; scrollbar-width:none; }
+.tfs::-webkit-scrollbar { display:none; }
+button { font:inherit; cursor:pointer; }
+button:focus-visible, input:focus-visible { outline:2px solid var(--orange); outline-offset:1px; }
+.chip { background:var(--dark2); color:#fff; border:0; border-radius:999px; padding:8px 14px; font-size:13px; white-space:nowrap; }
+.chip.on { background:var(--orange); color:#000; font-weight:600; }
+.chip:disabled { opacity:.35; }
+#indBtn { background:var(--orange); color:#000; font-weight:600; border:0; border-radius:999px; padding:8px 16px; font-size:13px; flex:none; }
+#backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:20; }
+#sheet { position:fixed; left:0; right:0; bottom:0; max-height:78%; overflow-y:auto; z-index:21; background:var(--dark); color:#fff;
+border-radius:18px 18px 0 0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 20px); }
+#sheet h2 { margin:0; font-size:17px; }
+.shead { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.mini { background:var(--dark2); color:#fff; border:0; border-radius:8px; padding:6px 12px; font-size:13px; }
+.mini.danger { color:#ff7a70; }
+.mini:disabled { opacity:.3; }
+.irow { background:var(--dark2); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+.ihead { display:flex; align-items:center; gap:10px; }
+.ihead .iname { flex:1; font-size:14px; }
+.ihead .mini { background:#3a3a3c; }
+.dot { width:12px; height:12px; border-radius:50%; flex:none; }
+.iform { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-top:12px; }
+.iform label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a8adb8; }
+.iform input { background:#3a3a3c; color:#fff; border:0; border-radius:8px; padding:8px; font:inherit; font-size:14px; width:100%; }
+.iform input[type=color] { padding:2px; height:36px; }
+.addh { margin:16px 0 8px; font-size:13px; color:#a8adb8; }
+.adds { display:flex; flex-wrap:wrap; gap:8px; }
+.empty { color:#a8adb8; font-size:13px; margin:0 0 8px; }
+.reset { margin-top:16px; width:100%; }
+#penBtn { background:var(--orange); color:#000; border:0; border-radius:999px; padding:8px 12px; flex:none; display:flex; align-items:center; }
+#penBtn svg { width:18px; height:18px; }
+#ov { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:3; }
+#ov.on { pointer-events:auto; touch-action:none; }
+#hint { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:6; background:var(--dark); color:#fff; padding:6px 8px 6px 14px; border-radius:999px; font-size:13px; display:flex; gap:10px; align-items:center; white-space:nowrap; }
+#selBar { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:6; background:var(--dark); color:#fff; padding:5px 8px 5px 12px; border-radius:999px; font-size:12px; display:flex; gap:6px; align-items:center; white-space:nowrap; box-shadow:0 4px 14px rgba(0,0,0,.28); max-width:calc(100% - 20px); overflow-x:auto; }
+#selBar .sname { font-weight:600; color:var(--orange); margin-right:2px; }
+#selBar .mini { background:#3a3a3c; padding:4px 9px; font-size:12px; border-radius:999px; }
+#selBar .mini.on { background:var(--orange); color:#000; font-weight:600; }
+#dsheet { position:fixed; left:0; right:0; bottom:0; max-height:78%; overflow-y:auto; z-index:21; background:var(--dark); color:#fff;
+border-radius:18px 18px 0 0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 20px); }
+#dsheet h2 { margin:0; font-size:17px; }
+.tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.tile { background:var(--dark2); color:#fff; border:0; border-radius:12px; padding:14px 4px 10px; font-size:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.tile svg { width:30px; height:30px; }
+.bell { background:#3a3a3c; color:#fff; border:0; border-radius:8px; padding:6px 10px; font-size:13px; }
+.bell.on { background:var(--orange); color:#000; }
+
+#btBtn { background:var(--dark2); color:#fff; border:1px solid #444; border-radius:999px; padding:8px 14px; font-size:13px; flex:none; }
+#bsheet { position:fixed; left:0; right:0; bottom:0; max-height:84%; overflow-y:auto; z-index:21; background:var(--dark); color:#fff;
+border-radius:18px 18px 0 0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 20px); }
+#bsheet h2 { margin:0; font-size:17px; }
+.bt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.bt-kpi { background:var(--dark2); border-radius:12px; padding:10px 12px; }
+.bt-kpi .k { font-size:11px; color:#a8adb8; }
+.bt-kpi .v { font-size:18px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+.bt-kpi .v.pos { color:#1faa59; }
+.bt-kpi .v.neg { color:#ff7a70; }
+.bt-form { display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin-bottom:12px; }
+.bt-form label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a8adb8; }
+.bt-form input, .bt-form select { background:#3a3a3c; color:#fff; border:0; border-radius:8px; padding:8px; font:inherit; font-size:13px; width:100%; }
+.bt-run { width:100%; background:var(--orange); color:#000; font-weight:700; border:0; border-radius:10px; padding:10px; font-size:14px; margin-bottom:12px; }
+.bt-run:disabled { opacity:.5; }
+.bt-list { display:flex; flex-direction:column; gap:6px; max-height:240px; overflow-y:auto; }
+.bt-item { background:var(--dark2); border-radius:10px; padding:8px 10px; font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:pointer; }
+.bt-badge { padding:2px 7px; border-radius:999px; font-weight:600; font-size:11px; }
+.bt-badge.win { background:#1faa5933; color:#1faa59; }
+.bt-badge.loss { background:#ff7a7033; color:#ff7a70; }
+.bt-badge.open { background:#f58b0a33; color:#f58b0a; }
+
+
+#dateBtn { background:var(--dark2); color:#fff; border:1px solid #444; border-radius:999px; padding:8px 12px; font-size:13px; flex:none; }
+#dateSheet { position:fixed; left:0; right:0; bottom:0; z-index:21; background:var(--dark); color:#fff;
+border-radius:18px 18px 0 0; padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 20px); }
+#dateSheet h2 { margin:0; font-size:17px; }
+#dateInput { width:100%; background:#3a3a3c; color:#fff; border:0; border-radius:10px; padding:12px; font:inherit; font-size:15px; margin-bottom:12px; color-scheme:dark; }
+#pastBar { position:absolute; top:8px; left:10px; z-index:6; background:var(--dark); color:#fff; padding:5px 8px 5px 12px; border-radius:999px; font-size:12px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+#pastBar .mini { background:var(--orange); color:#000; font-weight:600; border-radius:999px; padding:4px 10px; font-size:12px; }
+
+#toast { position:fixed; top:calc(env(safe-area-inset-top,0px) + 10px); left:12px; right:12px; z-index:40; background:var(--orange); color:#000; font-weight:600; padding:14px; border-radius:12px; }
+</style>
+</head>
+<body>
+<header>
+<div class="top"><span>OKX · BTC-USDT 무기한</span><div id="status"><i></i><span>연결 중</span></div></div>
+<div class="price" id="price">—</div>
+<div class="sub" id="chg">&nbsp;</div>
+<div class="sub" id="ohlc">&nbsp;</div>
+</header>
+<div id="chart"><canvas id="ov"></canvas><div id="hint" hidden><span id="hintTx"></span><button class="mini" id="hintX">취소</button></div><div id="selBar" hidden><span class="sname" id="selName"></span><button class="mini" id="selAlarm">🔕</button><button class="mini" id="selEdit">설정</button><button class="mini danger" id="selDel">삭제</button><button class="mini" id="selDone">완료</button></div><div id="pastBar" hidden><span>과거 차트 보기 중</span><button class="mini" id="backLive">최신으로</button></div><div id="err"></div></div>
+<nav>
+<div class="tfs" id="tfs"></div>
+<button id="dateBtn">날짜</button>
+<button id="btBtn">백테스트</button>
+<button id="indBtn">지표</button>
+<button id="penBtn" aria-label="그리기 도구"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l4 4L9 19l-5 1 1-5z"/><path d="M3 22c3-2 5 1 8-1"/></svg></button>
+</nav>
+<div id="backdrop" hidden></div>
+<section id="sheet" role="dialog" aria-label="지표 설정" hidden>
+<div class="shead"><h2>지표</h2><button class="mini" id="closeSheet">닫기</button></div>
+<div id="indList"></div>
+<div class="addh">지표 추가</div>
+<div class="adds" id="addList"></div>
+<button class="mini reset" id="resetInds">기본 지표로 되돌리기</button>
+</section>
+<section id="dsheet" role="dialog" aria-label="그리기 도구" hidden>
+<div class="shead"><h2>그리기</h2><button class="mini" id="closeD">닫기</button></div>
+<div class="tiles" id="tiles"></div>
+<div class="addh">그려 둔 도구</div>
+<div id="dList"></div>
+<button class="mini reset danger" id="clrD">모두 지우기</button>
+<p class="empty" style="margin-top:12px">알람을 켜면 가격이 선이나 가격대에 닿을 때 소리·진동·알림으로 알려요. 이 페이지가 열려 있고 화면이 켜져 있을 때만 울려요. 알람은 한 번 울리면 꺼져요.</p>
+</section>
+<section id="bsheet" role="dialog" aria-label="MSB-OB 백테스트" hidden>
+<div class="shead"><h2>BB(300) + MSB-OB 백테스트</h2><button class="mini" id="closeB">닫기</button></div>
+<p class="empty" id="btInfo">현재 타임프레임 기준으로 볼린저밴드 몸통 이탈 후 MSB 컨펌 진입을 계산합니다.</p>
+<div class="bt-form">
+<label><span>조회 캔들 수</span><select id="btBars"><option value="600">600봉</option><option value="1200" selected>1,200봉</option><option value="2000">2,000봉</option><option value="3000">3,000봉</option><option value="5000">5,000봉</option><option value="10000">10,000봉</option><option value="30000">30,000봉</option><option value="50000">50,000봉</option><option value="100000">100,000봉 (약 2.8년)</option><option value="180000">180,000봉 (약 5년)</option></select></label>
+<label><span>진입 방향</span><select id="btSide"><option value="all">롱 + 숏 전체</option><option value="long">롱만 (Bullish)</option><option value="short">숏만 (Bearish)</option></select></label>
+<label><span>BB 길이</span><input id="btBbLen" type="number" min="10" max="500" value="300"></label>
+<label><span>BB 배수</span><input id="btBbMult" type="number" min="0.5" max="5" step="0.1" value="2"></label>
+<label><span>MSB 길이</span><input id="btMsbLen" type="number" min="2" max="100" value="9"></label>
+<label><span>손절 : 익절 비율</span><select id="btRR"><option value="pct_2_1" selected>고정 -2% / +1% (100x)</option><option value="pct_2_1_be">고정 -2%/+1% (0.5% 반익절+본절)</option><option value="0.5">스윙 손절 2 : 익절 1</option><option value="1">손절 1 : 익절 1</option><option value="1.5">손절 1 : 익절 1.5</option><option value="2">손절 1 : 익절 2</option></select></label>
+<label><span>피보 확인값</span><input id="btFib" type="number" min="0" max="1" step="0.01" value="0.33"></label>
+<label><span>왕복 수수료 (%)</span><input id="btFee" type="number" min="0" max="1" step="0.01" value="0.10"></label>
+<label><span>진입 조건</span><select id="btMode"><option value="bravo" selected>브라보 (LL/HH 돌파)</option><option value="bravo_fib">브라보 (0.5 되돌림)</option><option value="alpha">알파 (모든 MSB)</option></select></label>
+<label><span>시드 관리 (100x)</span><select id="btSize"><option value="rm_5" selected>역마틴 (5→2.5→1%)</option><option value="rm_10">역마틴 (10→5→2.5→1%)</option><option value="fix_2">고정 시드 2% (2x)</option><option value="fix_3">고정 시드 3% (3x)</option><option value="fix_5">고정 시드 5% (5x)</option><option value="fix_10">고정 시드 10% (10x)</option></select></label>
+</div>
+<button class="bt-run" id="btRun">과거 데이터 불러와서 백테스트 실행</button>
+<div class="bt-grid" id="btKpi"></div>
+<div class="addh" id="btListH" hidden>거래 내역 (탭하면 차트 이동)</div>
+<div class="bt-list" id="btList"></div>
+</section>
+<section id="dateSheet" role="dialog" aria-label="날짜 이동" hidden>
+<div class="shead"><h2>날짜로 이동</h2><button class="mini" id="closeDate">닫기</button></div>
+<p class="empty">이동할 날짜와 시간을 선택하면 해당 시점의 차트로 바로 이동합니다.</p>
+<input type="datetime-local" id="dateInput">
+<button class="bt-run" id="dateGo">해당 날짜로 이동</button>
+</section>
+<div id="toast" hidden></div>
+
+<script>
+if (!window.LightweightCharts) {
+document.body.innerHTML = '<p style="padding:24px;color:#fff">차트 라이브러리를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>';
+throw new Error("lightweight-charts not loaded");
+}
+const { createChart, CandlestickSeries, LineSeries, HistogramSeries, LineStyle, CrosshairMode } = LightweightCharts;
+
+const TFS = [["1m","1분"],["5m","5분"],["15m","15분"],["1H","1시간"],["4H","4시간"],["1D","일"],["1W","주"]];
+const REST = "https://www.okx.com/api/v5/market/";
+const WS_URL = "wss://ws.okx.com:8443/ws/v5/business";
+const inst = "BTC-USDT-SWAP";
+
+// 트레이딩뷰 스크린샷에서 가져온 고정 색상
+const BG = "#d1d4dc", ORANGE = "#f58b0a", BLACK = "#0b0b0d";
+
+let bar = "1H";
+try { const b = localStorage.getItem("bar"); if (TFS.some(t => t[0] === b)) bar = b; } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+const tzShift = -new Date().getTimezoneOffset() * 60;
+const toT = ms => Math.floor(ms / 1000) + tzShift;
+
+const chart = createChart($("chart"), {
+autoSize: true,
+layout: { background: { color: BG }, textColor: "#9da2af", panes: { separatorColor: "#b4b8c5" }, attributionLogo: false },
+grid: { vertLines: { color: "#dcdee6" }, horzLines: { color: "#dcdee6" } },
+crosshair: { mode: CrosshairMode.Normal,
+vertLine: { color: "#5a5f6b", labelBackgroundColor: "#1c1c1e" },
+horzLine: { color: "#5a5f6b", labelBackgroundColor: "#1c1c1e" } },
+rightPriceScale: { borderColor: "#c3c7d2" },
+timeScale: { borderColor: "#c3c7d2", timeVisible: true, secondsVisible: false },
+});
+const candles = chart.addSeries(CandlestickSeries, {
+upColor: ORANGE, downColor: BLACK,
+borderUpColor: BLACK, borderDownColor: BLACK,
+wickUpColor: BLACK, wickDownColor: BLACK,
+priceLineColor: ORANGE, priceLineStyle: LineStyle.Dotted,
+priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+});
+
+let data = []; // 오래된 순: {t(ms), o,h,l,c,v}
+let loadingMore = false, noMore = false, token = 0, isPastView = false;
+
+/* ---------- 지표 계산 ---------- */
+const closes = () => data.map(d => d.c);
+function smaArr(src, n) {
+const o = Array(src.length).fill(null); let s = 0;
+for (let i = 0; i < src.length; i++) { s += src[i]; if (i >= n) s -= src[i - n]; if (i >= n - 1) o[i] = s / n; }
+return o;
+}
+function emaArr(src, n) {
+const o = Array(src.length).fill(null), k = 2 / (n + 1);
+let cnt = 0, sum = 0, prev = null;
+for (let i = 0; i < src.length; i++) {
+const v = src[i]; if (v == null) continue;
+if (prev == null) { sum += v; cnt++; if (cnt === n) { prev = sum / n; o[i] = prev; } }
+else { prev = v * k + prev * (1 - k); o[i] = prev; }
+}
+return o;
+}
+function bbArr(src, n, mult) {
+const mid = smaArr(src, n), up = Array(src.length).fill(null), lo = Array(src.length).fill(null);
+for (let i = n - 1; i < src.length; i++) {
+let v = 0; for (let j = i - n + 1; j <= i; j++) v += (src[j] - mid[i]) ** 2;
+const sd = Math.sqrt(v / n); up[i] = mid[i] + mult * sd; lo[i] = mid[i] - mult * sd;
+}
+return [mid, up, lo];
+}
+function rsiArr(c, n) {
+const o = Array(c.length).fill(null); if (c.length <= n) return o;
+let g = 0, l = 0;
+for (let i = 1; i <= n; i++) { const d = c[i] - c[i - 1]; if (d >= 0) g += d; else l -= d; }
+g /= n; l /= n; o[n] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+for (let i = n + 1; i < c.length; i++) {
+const d = c[i] - c[i - 1];
+g = (g * (n - 1) + (d > 0 ? d : 0)) / n; l = (l * (n - 1) + (d < 0 ? -d : 0)) / n;
+o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+return o;
+}
+function macdArr(c, f, s, sg) {
+const ef = emaArr(c, f), es = emaArr(c, s);
+const m = c.map((_, i) => (ef[i] != null && es[i] != null ? ef[i] - es[i] : null));
+const sig = emaArr(m, sg);
+const h = m.map((v, i) => (v != null && sig[i] != null ? v - sig[i] : null));
+return [h, m, sig];
+}
+const CALC = {
+vol: () => [data.map(d => d.v)],
+sma: p => [smaArr(closes(), p.period)],
+ema: p => [emaArr(closes(), p.period)],
+bb: p => bbArr(closes(), p.period, p.mult),
+rsi: p => [rsiArr(closes(), p.period)],
+macd: p => macdArr(closes(), p.fast, p.slow, p.signal),
+};
+
+/* ---------- 지표 정의 (설정 항목) ---------- */
+const PAL = ["#2962ff", "#8e24aa", "#00897b", "#d81b60", "#6d4c41"];
+const F = {
+period: { k: "period", l: "기간", t: "num", min: 2, max: 500, step: 1 },
+color: { k: "color", l: "색상", t: "color" },
+width: { k: "width", l: "굵기", t: "num", min: 1, max: 4, step: 1 },
+};
+const DEFS = {
+vol: { name: "거래량", fields: [], def: () => ({}) },
+sma: { name: "이동평균 (SMA)", fields: [F.period, F.color, F.width], def: n => ({ period: 20, color: PAL[n % PAL.length], width: 2 }) },
+ema: { name: "지수이동평균 (EMA)", fields: [F.period, F.color, F.width], def: n => ({ period: 20, color: PAL[(n + 2) % PAL.length], width: 2 }) },
+bb: { name: "볼린저밴드", fields: [F.period, { k: "mult", l: "표준편차 배수", t: "num", min: 0.1, max: 10, step: 0.1 }, F.color, F.width],
+def: () => ({ period: 20, mult: 2, color: "#0097a7", width: 1 }) },
+rsi: { name: "RSI", fields: [F.period, { k: "upper", l: "과매수선", t: "num", min: 1, max: 100, step: 1 }, { k: "lower", l: "과매도선", t: "num", min: 0, max: 99, step: 1 }, F.color, F.width],
+def: () => ({ period: 14, upper: 70, lower: 30, color: "#7e57c2", width: 2 }) },
+macd: { name: "MACD", fields: [{ k: "fast", l: "단기", t: "num", min: 2, max: 200, step: 1 }, { k: "slow", l: "장기", t: "num", min: 3, max: 400, step: 1 }, { k: "signal", l: "시그널", t: "num", min: 2, max: 100, step: 1 },
+{ k: "color", l: "MACD선 색", t: "color" }, { k: "color2", l: "시그널선 색", t: "color" }, F.width],
+def: () => ({ fast: 12, slow: 26, signal: 9, color: "#2962ff", color2: "#ff6d00", width: 2 }) },
+msb: { name: "MSB-OB (구조 돌파·오더블록)", fields: [{ k: "len", l: "지그재그 길이", t: "num", min: 2, max: 100, step: 1 }, { k: "fib", l: "피보 돌파 확인값", t: "num", min: 0, max: 1, step: 0.01 },
+{ k: "zz", l: "지그재그 표시 (1=켬, 0=끔)", t: "num", min: 0, max: 1, step: 1 }, { k: "color", l: "상승 색", t: "color" }, { k: "color2", l: "하락 색", t: "color" }],
+def: () => ({ len: 9, fib: 0.33, zz: 1, color: "#00b050", color2: "#e5484d" }) },
+};
+const label = i => {
+const p = i.p;
+switch (i.type) {
+case "vol": return "거래량";
+case "sma": return `SMA ${p.period}`;
+case "ema": return `EMA ${p.period}`;
+case "bb": return `볼린저밴드 ${p.period}, ${p.mult}`;
+case "rsi": return `RSI ${p.period}`;
+case "macd": return `MACD ${p.fast}, ${p.slow}, ${p.signal}`;
+case "msb": return `MSB-OB ${p.len}`;
+}
+};
+
+let nextId = 1;
+const defaultInds = () => [
+{ id: nextId++, type: "vol", p: DEFS.vol.def(0) },
+{ id: nextId++, type: "sma", p: DEFS.sma.def(0) },
+{ id: nextId++, type: "sma", p: { period: 60, color: PAL[1], width: 2 } },
+];
+let inds = [];
+try {
+const raw = JSON.parse(localStorage.getItem("inds") || "null");
+if (Array.isArray(raw)) {
+inds = raw.filter(x => DEFS[x.type]).map(x => ({ id: nextId++, type: x.type, p: Object.assign(DEFS[x.type].def(0), x.p) }));
+} else inds = defaultInds();
+} catch (e) { inds = defaultInds(); }
+const save = () => { try { localStorage.setItem("inds", JSON.stringify(inds.map(({ type, p }) => ({ type, p })))); } catch (e) {} };
+
+/* ---------- 지표 시리즈 ---------- */
+let live = []; // {ind, series:[{s, mk}]}
+const plain = v => ({ value: v });
+
+function build(ind, pane) {
+const p = ind.p;
+const line = (color, opt) => chart.addSeries(LineSeries, Object.assign(
+{ color, lineWidth: p.width || 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }, opt || {}), pane);
+switch (ind.type) {
+case "vol": {
+const s = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false }, 0);
+chart.priceScale("vol", 0).applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+return [{ s, mk: (v, i) => ({ value: v, color: data[i].c >= data[i].o ? ORANGE + "88" : BLACK + "55" }) }];
+}
+case "msb": return [];
+case "sma": case "ema":
+return [{ s: line(p.color), mk: plain }];
+case "bb":
+return [
+{ s: line(p.color, { lineStyle: LineStyle.Dashed }), mk: plain },
+{ s: line(p.color), mk: plain },
+{ s: line(p.color), mk: plain },
+];
+case "rsi": {
+const s = line(p.color, { lastValueVisible: true, priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
+[p.upper, p.lower].forEach(price => s.createPriceLine({ price, color: "#8e93a1", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: "" }));
+return [{ s, mk: plain }];
+}
+case "macd": {
+const fmt1 = { type: "price", precision: 1, minMove: 0.1 };
+const h = chart.addSeries(HistogramSeries, { priceFormat: fmt1, priceLineVisible: false, lastValueVisible: false }, pane);
+return [
+{ s: h, mk: v => ({ value: v, color: v >= 0 ? ORANGE + "bb" : BLACK + "88" }) },
+{ s: line(p.color, { priceFormat: fmt1 }), mk: plain },
+{ s: line(p.color2, { priceFormat: fmt1 }), mk: plain },
+];
+}
+}
+}
+
+function rebuild() {
+live.forEach(x => x.series.forEach(e => { try { chart.removeSeries(e.s); } catch (_) {} }));
+live = []; let pane = 0;
+inds.forEach(ind => {
+const own = ind.type === "rsi" || ind.type === "macd";
+live.push({ ind, series: build(ind, own ? ++pane : 0) });
+});
+fill();
+try { const ps = chart.panes(); ps[0].setStretchFactor(3); ps.slice(1).forEach(x => x.setStretchFactor(1)); } catch (e) {}
+}
+function fillOne(x) {
+if (x.ind.type === "msb") { x.shapes = msb(x.ind.p); dirty = true; return; }
+const arrs = CALC[x.ind.type](x.ind.p);
+x.series.forEach((e, k) => {
+const pts = [];
+arrs[k].forEach((v, i) => { if (v != null) pts.push(Object.assign({ time: toT(data[i].t) }, e.mk(v, i))); });
+e.s.setData(pts);
+});
+}
+const fill = () => live.forEach(fillOne);
+function updateLast() {
+const i = data.length - 1; if (i < 0) return;
+live.forEach(x => {
+if (x.ind.type === "msb") { x.shapes = msb(x.ind.p); return; }
+const arrs = CALC[x.ind.type](x.ind.p);
+x.series.forEach((e, k) => { const v = arrs[k][i]; if (v != null) e.s.update(Object.assign({ time: toT(data[i].t) }, e.mk(v, i))); });
+});
+}
+
+/* ---------- 데이터 ---------- */
+const fmt = n => n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const parse = r => ({ t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] });
+
+function render(shift) {
+const r = shift != null ? chart.timeScale().getVisibleLogicalRange() : null;
+candles.setData(data.map(d => ({ time: toT(d.t), open: d.o, high: d.h, low: d.l, close: d.c })));
+fill();
+if (r) chart.timeScale().setVisibleLogicalRange({ from: r.from + shift, to: r.to + shift });
+updateHeader(data.length - 1);
+}
+function updateHeader(i) {
+const d = data[i]; if (!d) return;
+const prev = data[i - 1];
+$("price").textContent = fmt(d.c);
+if (prev) {
+const df = d.c - prev.c, pc = df / prev.c * 100, sg = df >= 0 ? "+" : "−";
+$("chg").textContent = `${sg}${fmt(Math.abs(df))} (${sg}${Math.abs(pc).toFixed(2)}%)`;
+} else $("chg").textContent = "";
+$("ohlc").textContent = `시 ${fmt(d.o)} 고 ${fmt(d.h)} 저 ${fmt(d.l)} 종 ${fmt(d.c)}`;
+}
+function showError(msg) { const e = $("err"); e.style.display = msg ? "flex" : "none"; e.innerHTML = msg || ""; }
+function setStatus(on, text) { $("status").className = on ? "live" : ""; $("status").lastElementChild.textContent = text; }
+
+async function getJSON(url) {
+const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status);
+const j = await r.json(); if (j.code !== "0") throw new Error(j.msg || "OKX 오류");
+return j.data;
+}
+async function load() {
+const my = ++token; noMore = false; noNewer = false; isPastView = false; $("pastBar").hidden = true; data = [];
+showError(""); setStatus(false, "불러오는 중");
+try {
+const rows = await getJSON(`${REST}candles?instId=${inst}&bar=${bar}&limit=300`);
+if (my !== token) return;
+data = rows.map(parse).reverse();
+render();
+chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, data.length - 90), to: data.length + 4 });
+connect();
+} catch (e) {
+showError("OKX 데이터를 불러오지 못했어요.<br>파일을 브라우저에서 직접 열었는지, 인터넷이 연결돼 있는지 확인해 주세요.<br><small>" + e.message + "</small>");
+setStatus(false, "연결 실패");
+}
+}
+async function loadMore() {
+if (loadingMore || noMore || !data.length) return;
+loadingMore = true; const my = token;
+try {
+const rows = await getJSON(`${REST}history-candles?instId=${inst}&bar=${bar}&after=${data[0].t}&limit=100`);
+if (my !== token) return;
+if (!rows.length) { noMore = true; return; }
+const older = rows.map(parse).reverse();
+data = older.concat(data);
+render(older.length);
+} catch (e) { /* 다음 스크롤에서 재시도 */ }
+finally { loadingMore = false; }
+}
+let loadingNewer = false, noNewer = false;
+async function loadNewer() {
+if (loadingNewer || noNewer || !isPastView || !data.length) return;
+loadingNewer = true; const my = token;
+try {
+const lastT = data[data.length - 1].t;
+const rows = await getJSON(`${REST}history-candles?instId=${inst}&bar=${bar}&before=${lastT}&limit=100`);
+if (my !== token) return;
+if (!rows || !rows.length) { noNewer = true; return; }
+const newer = rows.map(parse).reverse().filter(x => x.t > lastT);
+if (!newer.length) { noNewer = true; return; }
+data = data.concat(newer);
+render(0);
+} catch (e) {}
+finally { loadingNewer = false; }
+}
+chart.timeScale().subscribeVisibleLogicalRangeChange(r => {
+if (!r) return;
+if (r.from < 15) loadMore();
+if (isPastView && r.to > data.length - 15) loadNewer();
+});
+
+let ws, pingTimer, retry;
+function connect() {
+clearTimeout(retry); clearInterval(pingTimer);
+if (ws) { ws.onclose = null; ws.close(); }
+const my = token;
+ws = new WebSocket(WS_URL);
+ws.onopen = () => {
+ws.send(JSON.stringify({ op: "subscribe", args: [{ channel: "candle" + bar, instId: inst }] }));
+pingTimer = setInterval(() => ws.readyState === 1 && ws.send("ping"), 20000);
+};
+ws.onmessage = ev => {
+if (ev.data === "pong") return;
+const m = JSON.parse(ev.data);
+if (m.event === "subscribe") { setStatus(true, "실시간"); return; }
+if (!m.data || my !== token || isPastView) return;
+for (const r of m.data) {
+const d = parse(r), last = data[data.length - 1];
+if (last && d.t === last.t) data[data.length - 1] = d;
+else if (!last || d.t > last.t) data.push(d);
+else continue;
+candles.update({ time: toT(d.t), open: d.o, high: d.h, low: d.l, close: d.c });
+updateLast();
+updateHeader(data.length - 1);
+chk();
+}
+};
+ws.onclose = () => { if (my === token) { setStatus(false, "재연결 중"); retry = setTimeout(connect, 2000); } };
+}
+
+/* ---------- UI ---------- */
+const tfBox = $("tfs");
+TFS.forEach(([v, text]) => {
+const b = el("button", "chip"); b.textContent = text; b.dataset.v = v;
+b.onclick = () => { bar = v; try { localStorage.setItem("bar", v); } catch (e) {} mark(); load(); };
+tfBox.appendChild(b);
+});
+function mark() { [...tfBox.children].forEach(b => b.classList.toggle("on", b.dataset.v === bar)); }
+
+chart.subscribeCrosshairMove(p => {
+const i = p.time ? data.findIndex(x => toT(x.t) === p.time) : -1;
+updateHeader(i >= 0 ? i : data.length - 1);
+});
+
+let openId = null;
+function openSheet() { $("backdrop").hidden = false; $("sheet").hidden = false; renderSheet(); }
+function closeSheet() { $("backdrop").hidden = true; $("sheet").hidden = true; $("dsheet").hidden = true; $("bsheet").hidden = true; $("dateSheet").hidden = true; openId = null; openD = null; }
+$("indBtn").onclick = openSheet;
+$("closeSheet").onclick = closeSheet;
+$("backdrop").onclick = closeSheet;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+$("resetInds").onclick = () => { inds = defaultInds(); save(); rebuild(); renderSheet(); };
+
+function renderSheet() {
+const list = $("indList"); list.textContent = "";
+if (!inds.length) { const p = el("p", "empty"); p.textContent = "추가된 지표가 없어요. 아래에서 추가해 보세요."; list.append(p); }
+inds.forEach(ind => {
+const def = DEFS[ind.type];
+const row = el("div", "irow"), head = el("div", "ihead");
+const dot = el("span", "dot"); dot.style.background = ind.p.color || ORANGE;
+const name = el("span", "iname"); name.textContent = label(ind);
+const bSet = el("button", "mini"); bSet.textContent = "설정"; bSet.disabled = !def.fields.length;
+const bDel = el("button", "mini danger"); bDel.textContent = "삭제";
+head.append(dot, name, bSet, bDel);
+const form = el("div", "iform"); form.hidden = ind.id !== openId;
+def.fields.forEach(f => {
+const lab = el("label"), sp = el("span"), inp = document.createElement("input");
+sp.textContent = f.l;
+inp.type = f.t === "color" ? "color" : "number";
+if (f.t === "num") { inp.min = f.min; inp.max = f.max; inp.step = f.step; inp.inputMode = "decimal"; }
+inp.value = ind.p[f.k];
+inp.addEventListener(f.t === "color" ? "input" : "change", () => {
+if (f.t === "color") ind.p[f.k] = inp.value;
+else {
+let v = Number(inp.value); if (!isFinite(v)) v = ind.p[f.k];
+v = Math.min(f.max, Math.max(f.min, v)); ind.p[f.k] = v; inp.value = v;
+}
+name.textContent = label(ind);
+if (ind.p.color) dot.style.background = ind.p.color;
+save(); rebuild();
+});
+lab.append(sp, inp); form.append(lab);
+});
+bSet.onclick = () => { form.hidden = !form.hidden; };
+bDel.onclick = () => { inds = inds.filter(x => x !== ind); save(); rebuild(); renderSheet(); };
+row.append(head, form); list.append(row);
+});
+const add = $("addList"); add.textContent = "";
+Object.keys(DEFS).forEach(t => {
+const b = el("button", "chip"); b.textContent = "+ " + DEFS[t].name;
+if (t === "vol" && inds.some(x => x.type === "vol")) b.disabled = true;
+b.onclick = () => {
+const n = inds.filter(x => x.type === t).length;
+const ind = { id: nextId++, type: t, p: DEFS[t].def(n) };
+inds.push(ind); openId = ind.id; save(); rebuild(); renderSheet();
+};
+add.append(b);
+});
+}
+
+/* ===== MSB-OB (EmreKb, MPL 2.0 파인스크립트 이식) ===== */
+function msb(p) {
+const n = data.length, L = p.len, H = data.map(d => d.h), Lo = data.map(d => d.l), C = data.map(d => d.c), O = data.map(d => d.o);
+const o = { zig: [], lines: [], labels: [], boxes: [] }, hs = [], ls = [];
+let trend = 1, lastUp = -1, lastDn = -1, eqL = -1, eqH = -1, market = 1, lL0, lH0;
+const bear = k => O[k] > C[k], bull = k => O[k] < C[k];
+const pick = (a, b, f, d) => { let r = d; const s = Math.max(0, Math.min(a, b)), e = Math.min(n - 1, Math.max(a, b)); for (let k = s; k <= e; k++) if (f(k)) r = k; return r; };
+for (let i = L - 1; i < n; i++) {
+let hh = -Infinity, ll = Infinity;
+for (let k = i - L + 1; k <= i; k++) { hh = Math.max(hh, H[k]); ll = Math.min(ll, Lo[k]); }
+const up = H[i] >= hh, dn = Lo[i] <= ll, old = trend;
+trend = trend === 1 && dn ? -1 : trend === -1 && up ? 1 : trend;
+let s = lastUp < 0 ? 1 : i - 1 - lastUp; if (s <= 0) s = 1;
+let lv = Infinity; for (let k = Math.max(0, i - s + 1); k <= i; k++) lv = Math.min(lv, Lo[k]); if (lv === Lo[i]) eqL = i;
+let s2 = lastDn < 0 ? 1 : i - 1 - lastDn; if (s2 <= 0) s2 = 1;
+let hv = -Infinity; for (let k = Math.max(0, i - s2 + 1); k <= i; k++) hv = Math.max(hv, H[k]); if (hv === H[i]) eqH = i;
+if (up) lastUp = i; if (dn) lastDn = i;
+if (trend !== old) {
+if (trend === 1) ls.push({ v: lv, i: eqL }); else hs.push({ v: hv, i: eqH });
+if (p.zz && hs.length && ls.length) { const a = hs[hs.length - 1], b = ls[ls.length - 1]; o.zig.push({ i1: a.i, p1: a.v, i2: b.i, p2: b.v }); }
+}
+if (hs.length < 2 || ls.length < 2) continue;
+const h0 = hs[hs.length - 1], h1 = hs[hs.length - 2], l0 = ls[ls.length - 1], l1 = ls[ls.length - 2];
+if (lL0 === l0.v || lH0 === h0.v) continue;
+let nm = market;
+if (market === 1 && l0.v < l1.v && l0.v < l1.v - Math.abs(h0.v - l1.v) * p.fib) nm = -1;
+else if (market === -1 && h0.v > h1.v && h0.v > h1.v + Math.abs(h1.v - l0.v) * p.fib) nm = 1;
+if (nm === market) continue;
+market = nm; lL0 = l0.v; lH0 = h0.v;
+if (market === 1) {
+o.lines.push({ i1: h1.i, i2: h0.i, p: h1.v, c: 1 });
+o.labels.push({ i: Math.round((h1.i + l0.i) / 2), p: h1.v, t: "MSB", c: 1, up: 1 });
+const a = pick(h1.i, l0.i, bear, l0.i), b = pick(l1.i - L, h1.i, bull, h1.i);
+o.boxes.push({ i: a, top: H[a], bot: Lo[a], bull: 1, t: "Bu-OB", k: "o1", born: i }, { i: b, top: H[b], bot: Lo[b], bull: 1, t: l0.v < l1.v ? "Bu-BB" : "Bu-MB", k: "b1", born: i });
+} else {
+o.lines.push({ i1: l1.i, i2: l0.i, p: l1.v, c: 0 });
+o.labels.push({ i: Math.round((l1.i + h0.i) / 2), p: l1.v, t: "MSB", c: 0, up: 0 });
+const a = pick(l1.i, h0.i, bull, h0.i), b = pick(h1.i - L, l1.i, bear, l1.i);
+o.boxes.push({ i: a, top: H[a], bot: Lo[a], bull: 0, t: "Be-OB", k: "o0", born: i }, { i: b, top: H[b], bot: Lo[b], bull: 0, t: h0.v > h1.v ? "Be-BB" : "Be-MB", k: "b0", born: i });
+}
+}
+o.boxes = o.boxes.filter(bx => { for (let j = bx.born + 1; j < n; j++) if (bx.bull ? C[j] < bx.bot : C[j] > bx.top) return false; return true; });
+const cnt = {};
+o.boxes = o.boxes.reverse().filter(bx => (cnt[bx.k] = (cnt[bx.k] || 0) + 1) <= 5).reverse();
+return o;
+}
+
+/* ===== 그리기 도구 ===== */
+const FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const TOOLS = {
+trend: { name: "추세선", n: 2, col: "#2962ff", pl: ["가격 1", "가격 2"], ic: '<path d="M6 18L18 6"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/>' },
+ray: { name: "광선", n: 2, col: "#2962ff", pl: ["가격 1", "가격 2"], ic: '<path d="M6 17L21 7"/><circle cx="5" cy="18" r="2"/>' },
+hline: { name: "수평선", n: 1, col: "#2962ff", pl: ["가격"], ic: '<path d="M3 12h18"/><circle cx="12" cy="12" r="2"/>' },
+vline: { name: "수직선", n: 1, col: "#2962ff", pl: [], ic: '<path d="M12 3v18"/><circle cx="12" cy="12" r="2"/>' },
+fib: { name: "피보나치 되돌림", n: 2, col: "#7e57c2", pl: ["시작 가격", "끝 가격"], ic: '<path d="M4 5h16M4 10h16M4 15h16M4 20h16"/>' },
+long: { name: "롱 포지션", n: 2, col: "#2962ff", pl: ["진입 가격", "익절 가격"], ic: '<path d="M5 6h14M5 12h14M5 18h14"/><text x="12" y="16" font-size="8" fill="currentColor" stroke="none" text-anchor="middle">L</text>' },
+short: { name: "숏 포지션", n: 2, col: "#2962ff", pl: ["진입 가격", "익절 가격"], ic: '<path d="M5 6h14M5 12h14M5 18h14"/><text x="12" y="16" font-size="8" fill="currentColor" stroke="none" text-anchor="middle">S</text>' },
+prange: { name: "가격 범위", n: 2, col: "#2962ff", pl: ["가격 1", "가격 2"], ic: '<path d="M12 4v16M8.5 7.5L12 4l3.5 3.5M8.5 16.5L12 20l3.5-3.5"/>' },
+rect: { name: "네모", n: 2, col: "#f58b0a", pl: ["가격 1", "가격 2"], ic: '<rect x="5" y="6" width="14" height="12"/>' },
+};
+let drawings = [];
+try { const r = JSON.parse(localStorage.getItem("draws") || "[]"); if (Array.isArray(r)) drawings = r.filter(d => TOOLS[d.type] && Array.isArray(d.pts)); } catch (e) {}
+const saveD = () => { try { localStorage.setItem("draws", JSON.stringify(drawings)); } catch (e) {} };
+
+const ov = $("ov"), g = ov.getContext("2d"), ts = chart.timeScale();
+let dirty = true, selId = null, tool = null, pend = [], openD = null;
+const BARMS = { "1m": 6e4, "5m": 3e5, "15m": 9e5, "1H": 36e5, "4H": 144e5, "1D": 864e5, "1W": 6048e5 };
+const bms = () => BARMS[bar];
+function t2l(t) {
+const n = data.length; if (!n) return null;
+if (t <= data[0].t) return (t - data[0].t) / bms();
+let a = 0, b = n - 1; while (a < b) { const m = (a + b + 1) >> 1; if (data[m].t <= t) a = m; else b = m - 1; }
+return a + (t - data[a].t) / bms();
+}
+function l2t(l) {
+const n = data.length; l = Math.round(l);
+if (l <= 0) return data[0].t + l * bms();
+if (l >= n - 1) return data[n - 1].t + (l - n + 1) * bms();
+return data[l].t;
+}
+const X = t => { const l = t2l(t); return l == null ? null : ts.logicalToCoordinate(l); };
+const Y = p => candles.priceToCoordinate(p);
+const LX = i => ts.logicalToCoordinate(i);
+const roundP = p => Math.round(p * 10) / 10;
+
+function size() {
+const r = $("chart").getBoundingClientRect(), d = window.devicePixelRatio || 1;
+ov.width = r.width * d; ov.height = r.height * d; g.setTransform(d, 0, 0, d, 0, 0); dirty = true;
+}
+new ResizeObserver(size).observe($("chart"));
+
+function fmtRem(ms) {
+const tot = Math.max(0, Math.floor(ms / 1000));
+const pad = n => String(n).padStart(2, "0");
+const d = Math.floor(tot / 86400);
+const h = Math.floor((tot % 86400) / 3600);
+const m = Math.floor((tot % 3600) / 60);
+const s = tot % 60;
+if (d > 0) return `${d}d ${pad(h)}:${pad(m)}`;
+if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+return `${pad(m)}:${pad(s)}`;
+}
+
+function drawMsb(x, R) {
+const s = x.shapes, p = x.ind.p, col = b => (b ? p.color : p.color2);
+g.setLineDash([]); g.lineWidth = 1; g.strokeStyle = "#6d7280";
+s.zig.forEach(z => {
+const a = LX(z.i1), b = LX(z.i2), y1 = Y(z.p1), y2 = Y(z.p2);
+if (a == null || b == null || y1 == null || y2 == null) return;
+g.beginPath(); g.moveTo(a, y1); g.lineTo(b, y2); g.stroke();
+});
+s.boxes.forEach(b => {
+const x1 = LX(b.i), y1 = Y(b.top), y2 = Y(b.bot), x2 = LX(data.length - 1 + 10);
+if (x1 == null || y1 == null || y2 == null || x2 == null) return;
+const c = col(b.bull); g.fillStyle = c + "4d"; g.strokeStyle = c; g.lineWidth = 1;
+g.fillRect(x1, y1, x2 - x1, y2 - y1); g.strokeRect(x1, y1, x2 - x1, y2 - y1);
+g.fillStyle = c; g.font = "11px sans-serif"; g.textAlign = "right"; g.textBaseline = "middle"; g.fillText(b.t, x2 - 4, (y1 + y2) / 2);
+});
+s.lines.forEach(l => {
+const a = LX(l.i1), b = LX(l.i2), y = Y(l.p); if (a == null || b == null || y == null) return;
+g.strokeStyle = col(l.c); g.lineWidth = 2; g.beginPath(); g.moveTo(a, y); g.lineTo(b, y); g.stroke();
+});
+s.labels.forEach(l => {
+const a = LX(l.i), y = Y(l.p); if (a == null || y == null) return;
+g.fillStyle = col(l.c); g.font = "bold 11px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(l.t, a, y + (l.up ? -9 : 9));
+});
+}
+
+function getHandles(d, R, ph) {
+const pts = d.pts.map(q => ({ x: X(q.t), y: Y(q.p) }));
+if (pts.some(q => q.x == null || q.y == null)) return [];
+const [a, b] = pts;
+switch (d.type) {
+case "hline": return [{ x: R / 2, y: a.y, role: "p0y" }];
+case "vline": return [{ x: a.x, y: ph / 2, role: "p0x" }];
+case "rect": return [
+{ x: a.x, y: a.y, role: "p0" },
+{ x: b.x, y: b.y, role: "p1" },
+{ x: b.x, y: a.y, role: "mix10" },
+{ x: a.x, y: b.y, role: "mix01" },
+];
+case "long": case "short": {
+const ys = Y(d.sl);
+const x2 = Math.max(b.x, a.x + 80);
+const list = [{ x: a.x, y: a.y, role: "p0" }, { x: x2, y: b.y, role: "p1" }];
+if (ys != null) list.push({ x: a.x, y: ys, role: "sl" });
+return list;
+}
+default: return pts.map((q, idx) => ({ x: q.x, y: q.y, role: idx === 0 ? "p0" : "p1" }));
+}
+}
+
+function drawOne(d, R, ph) {
+const sel = d.id === selId, pts = d.pts.map(q => ({ x: X(q.t), y: Y(q.p) }));
+if (pts.some(q => q.x == null || q.y == null)) return;
+const [a, b] = pts, col = d.color;
+g.strokeStyle = col; g.fillStyle = col; g.lineWidth = d.width; g.setLineDash([]);
+const ln = (x1, y1, x2, y2) => { g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+const tx = (s, x, y, al, c) => { g.font = "11px sans-serif"; g.textAlign = al || "left"; g.textBaseline = "bottom"; g.fillStyle = c || col; g.fillText(s, x, y); };
+const box = (x1, y1, x2, y2, c) => { g.fillStyle = c; g.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1)); };
+const pc = (v, base) => `${v >= 0 ? "+" : "−"}${Math.abs(v / base * 100).toFixed(2)}%`;
+switch (d.type) {
+case "trend": ln(a.x, a.y, b.x, b.y); break;
+case "ray": { const ex = b.x >= a.x ? R + 60 : -60, k = b.x === a.x ? 0 : (b.y - a.y) / (b.x - a.x); ln(a.x, a.y, ex, a.y + k * (ex - a.x)); break; }
+case "hline": ln(0, a.y, R, a.y); tx(fmt(d.pts[0].p), R - 4, a.y - 2, "right"); break;
+case "vline": ln(a.x, 0, a.x, ph); break;
+case "fib": {
+const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x, x1 + 80);
+g.setLineDash([4, 4]); ln(a.x, a.y, b.x, b.y); g.setLineDash([]);
+FIB.forEach(v => { const p = d.pts[1].p - (d.pts[1].p - d.pts[0].p) * v, y = Y(p); if (y == null) return; ln(x1, y, x2, y); tx(`${v} (${fmt(p)})`, x1 + 4, y - 2); });
+break;
+}
+case "long": case "short": {
+const ys = Y(d.sl); if (ys == null) break;
+const x1 = a.x, x2 = Math.max(b.x, a.x + 80), e = d.pts[0].p, tp = d.pts[1].p;
+box(x1, a.y, x2, b.y, "#1faa5933"); box(x1, a.y, x2, ys, "#e5484d33");
+ln(x1, a.y, x2, a.y); g.strokeStyle = "#1faa59"; ln(x1, b.y, x2, b.y); g.strokeStyle = "#e5484d"; ln(x1, ys, x2, ys);
+tx(`익절 ${fmt(tp)} (${pc(tp - e, e)})`, x1 + 4, b.y - 2, "left", "#1faa59");
+tx(`손절 ${fmt(d.sl)} (${pc(d.sl - e, e)})`, x1 + 4, ys - 2, "left", "#e5484d");
+tx(`진입 ${fmt(e)} · 손익비 ${(Math.abs(tp - e) / Math.abs(e - d.sl) || 0).toFixed(1)}`, x1 + 4, a.y - 2);
+break;
+}
+case "prange": {
+box(a.x, a.y, b.x, b.y, col + "22"); ln(b.x, a.y, b.x, b.y);
+const df = d.pts[1].p - d.pts[0].p, bars = Math.round(Math.abs(t2l(d.pts[1].t) - t2l(d.pts[0].t)));
+tx(`${df >= 0 ? "+" : "−"}${fmt(Math.abs(df))} (${pc(df, d.pts[0].p)}) · ${bars}봉`, Math.min(a.x, b.x) + 4, Math.min(a.y, b.y) - 2);
+break;
+}
+case "rect": box(a.x, a.y, b.x, b.y, col + "33"); g.strokeStyle = col; g.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)); break;
+}
+if (d.alarm) tx("🔔", a.x + 6, a.y - 6);
+if (sel) {
+const hs = getHandles(d, R, ph);
+hs.forEach(q => { g.beginPath(); g.arc(q.x, q.y, 6, 0, 7); g.fillStyle = "#fff"; g.fill(); g.strokeStyle = col; g.lineWidth = 2; g.stroke(); });
+}
+}
+
+function drawCountdown(W, R, ph) {
+if (!data.length) return;
+const last = data[data.length - 1];
+const py = Y(last.c);
+const pw = W - R;
+if (py == null || pw < 20 || py < -10 || py > ph + 10) return;
+const rem = Math.max(0, last.t + bms() - Date.now());
+const txt = fmtRem(rem);
+const up = last.c >= last.o;
+const bg = up ? ORANGE : BLACK;
+const fg = up ? BLACK : "#ffffff";
+const boxH = 16;
+const boxY = Math.min(ph - boxH - 1, Math.max(1, py + 10));
+g.save();
+g.beginPath();
+g.rect(R, 0, pw, ph);
+g.clip();
+g.fillStyle = bg;
+g.fillRect(R + 1, boxY, pw - 2, boxH);
+g.fillStyle = fg;
+g.font = "600 11px -apple-system, 'Apple SD Gothic Neo', sans-serif";
+g.textAlign = "center";
+g.textBaseline = "middle";
+g.fillText(txt, R + pw / 2, boxY + boxH / 2 + 0.5);
+g.restore();
+}
+
+function draw() {
+const W = $("chart").clientWidth, Ht = $("chart").clientHeight; g.clearRect(0, 0, W, Ht);
+let pw = 0, ph = Ht;
+try { pw = chart.priceScale("right").width(); ph = chart.panes()[0].getHeight(); } catch (e) {}
+const R = W - pw;
+g.save(); g.beginPath(); g.rect(0, 0, R, ph); g.clip();
+live.forEach(x => x.shapes && drawMsb(x, R));
+drawings.forEach(d => drawOne(d, R, ph));
+pend.forEach(q => { const x = X(q.t), y = Y(q.p); if (x == null || y == null) return; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fillStyle = ORANGE; g.fill(); });
+g.restore();
+drawCountdown(W, R, ph);
+}
+let sig = "";
+(function loop() {
+const r = ts.getVisibleLogicalRange();
+const sec = Math.floor(Date.now() / 1000);
+const s = [r && r.from.toFixed(2), r && r.to.toFixed(2), Y(0), Y(1e5), $("chart").clientWidth, data.length, data.length && data[data.length - 1].c, selId, pend.length, live.length, sec].join("|");
+if (s !== sig || dirty) { sig = s; dirty = false; draw(); }
+requestAnimationFrame(loop);
+})();
+
+/* 선택 바 UI */
+function syncSelBar() {
+const barEl = $("selBar");
+const d = selId != null ? drawings.find(x => x.id === selId) : null;
+if (!d || tool) { barEl.hidden = true; return; }
+$("selName").textContent = TOOLS[d.type].name;
+const al = $("selAlarm");
+al.textContent = d.alarm ? "🔔 켜짐" : "🔕 알람";
+al.classList.toggle("on", !!d.alarm);
+barEl.hidden = false;
+}
+function setSelected(id) {
+selId = id;
+dirty = true;
+syncSelBar();
+}
+$("selAlarm").onclick = () => {
+const d = drawings.find(x => x.id === selId); if (!d) return;
+d.alarm = !d.alarm;
+if (d.alarm) { unlock(); try { window.Notification && Notification.permission === "default" && Notification.requestPermission(); } catch (e) {} }
+saveD(); keepAwake(); dirty = true; syncSelBar();
+};
+$("selEdit").onclick = () => {
+if (selId == null) return;
+openD = selId;
+openDrawSheet();
+};
+$("selDel").onclick = () => {
+if (selId == null) return;
+drawings = drawings.filter(x => x.id !== selId);
+setSelected(null);
+saveD(); keepAwake();
+};
+$("selDone").onclick = () => setSelected(null);
+
+/* 그리기: 탭으로 점 찍기 */
+function setHint(t) { $("hint").hidden = !t; $("hintTx").textContent = t || ""; }
+function startTool(k) {
+tool = k; pend = []; setSelected(null); ov.classList.add("on"); closeSheet();
+setHint(TOOLS[k].n === 1 ? "차트를 탭해서 위치를 정하세요" : "차트를 탭해서 첫 번째 점을 정하세요"); dirty = true;
+}
+function cancelTool() { tool = null; pend = []; ov.classList.remove("on"); setHint(""); dirty = true; }
+$("hintX").onclick = cancelTool;
+function finishDraw() {
+const T = TOOLS[tool], d = { id: Date.now(), type: tool, pts: pend, color: T.col, width: 2, alarm: false };
+if (tool === "long" || tool === "short") { const e = pend[0].p, tp = pend[1].p; d.sl = Math.round((e - (tp - e) / 2) * 10) / 10; }
+drawings.push(d); saveD(); cancelTool(); setSelected(d.id);
+}
+let dn = null;
+ov.addEventListener("pointerdown", e => { dn = { x: e.clientX, y: e.clientY }; });
+ov.addEventListener("pointerup", e => {
+if (!tool || !dn) return;
+const moved = Math.hypot(e.clientX - dn.x, e.clientY - dn.y); dn = null; if (moved > 12) return;
+const r = ov.getBoundingClientRect(), l = ts.coordinateToLogical(e.clientX - r.left), pr = candles.coordinateToPrice(e.clientY - r.top);
+if (l == null || pr == null || !data.length) return;
+pend.push({ t: l2t(l), p: roundP(pr) }); dirty = true;
+if (pend.length >= TOOLS[tool].n) finishDraw(); else setHint("두 번째 점을 탭하세요");
+});
+
+/* 그려 둔 도구 히트 테스트 & 트레이딩뷰식 드래그 이동/리사이즈 */
+function seg(px, py, x1, y1, x2, y2) {
+const dx = x2 - x1, dy = y2 - y1, l = dx * dx + dy * dy; let t = l ? ((px - x1) * dx + (py - y1) * dy) / l : 0; t = Math.max(0, Math.min(1, t));
+return Math.hypot(px - x1 - t * dx, py - y1 - t * dy);
+}
+function hitOne(d, x, y) {
+const pts = d.pts.map(q => ({ x: X(q.t), y: Y(q.p) }));
+if (pts.some(q => q.x == null || q.y == null)) return false;
+const [a, b] = pts;
+switch (d.type) {
+case "trend": return seg(x, y, a.x, a.y, b.x, b.y) < 16;
+case "ray": return seg(x, y, a.x, a.y, a.x + (b.x - a.x) * 1000, a.y + (b.y - a.y) * 1000) < 16;
+case "hline": return Math.abs(y - a.y) < 16;
+case "vline": return Math.abs(x - a.x) < 16;
+default: {
+const ys = [a.y, b.y]; if (d.sl != null && Y(d.sl) != null) ys.push(Y(d.sl));
+const x2 = d.type === "long" || d.type === "short" ? Math.max(a.x, b.x, a.x + 80) : Math.max(a.x, b.x);
+return x >= Math.min(a.x, b.x) - 10 && x <= x2 + 10 && y >= Math.min(...ys) - 10 && y <= Math.max(...ys) + 10;
+}
+}
+}
+function hit(x, y) {
+for (let k = drawings.length - 1; k >= 0; k--) {
+if (hitOne(drawings[k], x, y)) return drawings[k];
+}
+return null;
+}
+
+function getPlotDim() {
+const W = $("chart").clientWidth, Ht = $("chart").clientHeight;
+let pw = 0, ph = Ht;
+try { pw = chart.priceScale("right").width(); ph = chart.panes()[0].getHeight(); } catch (e) {}
+return { R: W - pw, ph };
+}
+
+let drag = null;
+const chartEl = $("chart");
+
+chartEl.addEventListener("pointerdown", e => {
+if (tool || !data.length) return;
+if (e.target.closest("#selBar, #hint, #err")) return;
+if (selId == null) return;
+const d = drawings.find(x => x.id === selId);
+if (!d) return;
+const r = chartEl.getBoundingClientRect();
+const x = e.clientX - r.left, y = e.clientY - r.top;
+const { R, ph } = getPlotDim();
+if (x > R || y > ph) return;
+
+let role = null;
+const hs = getHandles(d, R, ph);
+let best = 20;
+for (const h of hs) {
+const dist = Math.hypot(x - h.x, y - h.y);
+if (dist < best) { best = dist; role = h.role; }
+}
+if (!role && hitOne(d, x, y)) role = "move";
+if (!role) return;
+
+const startL = ts.coordinateToLogical(x);
+const startP = candles.coordinateToPrice(y);
+if (startL == null || startP == null) return;
+
+e.stopPropagation();
+e.preventDefault();
+chart.applyOptions({ handleScroll: false, handleScale: false });
+drag = {
+d, role,
+startL, startP,
+origPts: d.pts.map(q => ({ t: q.t, l: t2l(q.t), p: q.p })),
+origSl: d.sl,
+moved: false,
+pid: e.pointerId,
+};
+try { chartEl.setPointerCapture(e.pointerId); } catch (_) {}
+}, { capture: true });
+
+chartEl.addEventListener("pointermove", e => {
+if (!drag) {
+if (!tool && selId != null && e.pointerType === "mouse") {
+const d = drawings.find(x => x.id === selId);
+if (d) {
+const r = chartEl.getBoundingClientRect();
+const x = e.clientX - r.left, y = e.clientY - r.top;
+const { R, ph } = getPlotDim();
+const onH = getHandles(d, R, ph).some(h => Math.hypot(x - h.x, y - h.y) < 16);
+chartEl.style.cursor = onH ? "pointer" : hitOne(d, x, y) ? "move" : "";
+}
+}
+return;
+}
+if (e.pointerId !== drag.pid) return;
+const r = chartEl.getBoundingClientRect();
+const x = e.clientX - r.left, y = e.clientY - r.top;
+const curL = ts.coordinateToLogical(x);
+const curP = candles.coordinateToPrice(y);
+if (curL == null || curP == null) return;
+
+const dl = Math.round(curL - drag.startL);
+const dp = curP - drag.startP;
+if (dl !== 0 || Math.abs(dp) > 0.05) drag.moved = true;
+
+const d = drag.d, o = drag.origPts;
+switch (drag.role) {
+case "move":
+d.pts.forEach((q, i) => { q.t = l2t(o[i].l + dl); q.p = roundP(o[i].p + dp); });
+if (drag.origSl != null) d.sl = roundP(drag.origSl + dp);
+break;
+case "p0":
+d.pts[0].t = l2t(o[0].l + dl); d.pts[0].p = roundP(o[0].p + dp);
+break;
+case "p1":
+d.pts[1].t = l2t(o[1].l + dl); d.pts[1].p = roundP(o[1].p + dp);
+break;
+case "p0y":
+d.pts[0].p = roundP(o[0].p + dp);
+break;
+case "p0x":
+d.pts[0].t = l2t(o[0].l + dl);
+break;
+case "mix10":
+d.pts[1].t = l2t(o[1].l + dl); d.pts[0].p = roundP(o[0].p + dp);
+break;
+case "mix01":
+d.pts[0].t = l2t(o[0].l + dl); d.pts[1].p = roundP(o[1].p + dp);
+break;
+case "sl":
+d.sl = roundP(drag.origSl + dp);
+break;
+}
+dirty = true;
+});
+
+function endDrag(e) {
+if (!drag) return;
+if (e && drag.pid != null && e.pointerId !== drag.pid) return;
+const wasMoved = drag.moved;
+try { chartEl.releasePointerCapture(drag.pid); } catch (_) {}
+drag = null;
+chartEl.style.cursor = "";
+chart.applyOptions({ handleScroll: true, handleScale: true });
+if (wasMoved) saveD();
+dirty = true;
+}
+chartEl.addEventListener("pointerup", endDrag);
+chartEl.addEventListener("pointercancel", endDrag);
+
+chart.subscribeClick(p => {
+if (tool || drag || !p.point) return;
+const d = hit(p.point.x, p.point.y);
+if (d) setSelected(d.id);
+else if (selId != null) setSelected(null);
+});
+
+/* 그리기 시트 */
+function openDrawSheet() { $("backdrop").hidden = false; $("dsheet").hidden = false; $("sheet").hidden = true; renderDraw(); }
+$("penBtn").onclick = () => { if (tool) cancelTool(); openDrawSheet(); };
+$("closeD").onclick = closeSheet;
+$("clrD").onclick = () => { drawings = []; setSelected(null); openD = null; saveD(); keepAwake(); renderDraw(); };
+function fld(form, text, type, val, onch, attrs) {
+const lab = el("label"), sp = el("span"), inp = document.createElement("input");
+sp.textContent = text; inp.type = type; inp.value = val; Object.assign(inp, attrs || {});
+inp.addEventListener(type === "color" ? "input" : "change", () => onch(inp)); lab.append(sp, inp); form.append(lab);
+}
+function renderDraw() {
+const t = $("tiles");
+if (!t.children.length) Object.keys(TOOLS).forEach(k => {
+const b = el("button", "tile");
+b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${TOOLS[k].ic}</svg><span>${TOOLS[k].name}</span>`;
+b.onclick = () => startTool(k); t.append(b);
+});
+const list = $("dList"); list.textContent = "";
+if (!drawings.length) { const p = el("p", "empty"); p.textContent = "아직 그린 게 없어요. 위에서 도구를 골라 차트를 탭해 보세요."; list.append(p); }
+drawings.forEach(d => {
+const T = TOOLS[d.type], row = el("div", "irow"), head = el("div", "ihead");
+const dot = el("span", "dot"); dot.style.background = d.color;
+const name = el("span", "iname");
+name.textContent = `${T.name} ${d.type === "vline" ? new Date(d.pts[0].t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : fmt(d.pts[0].p)}`;
+const bell = el("button", "bell" + (d.alarm ? " on" : "")); bell.textContent = d.alarm ? "🔔 켜짐" : "🔕 꺼짐";
+const bSet = el("button", "mini"); bSet.textContent = "설정";
+const bDel = el("button", "mini danger"); bDel.textContent = "삭제";
+head.append(dot, name, bell, bSet, bDel);
+const form = el("div", "iform"); form.hidden = d.id !== openD;
+fld(form, "색상", "color", d.color, i => { d.color = i.value; dot.style.background = i.value; saveD(); dirty = true; });
+fld(form, "굵기", "number", d.width, i => { d.width = Math.min(4, Math.max(1, Number(i.value) || 2)); i.value = d.width; saveD(); dirty = true; }, { min: 1, max: 4, step: 1 });
+const pf = (txt, get, set) => fld(form, txt, "number", get(), i => { const v = Number(i.value); if (isFinite(v)) { set(v); saveD(); dirty = true; } }, { step: 0.1, inputMode: "decimal" });
+T.pl.forEach((txt, k) => pf(txt, () => d.pts[k].p, v => { d.pts[k].p = v; }));
+if (d.sl != null) pf("손절 가격", () => d.sl, v => { d.sl = v; });
+bell.onclick = () => {
+d.alarm = !d.alarm;
+if (d.alarm) { unlock(); try { window.Notification && Notification.permission === "default" && Notification.requestPermission(); } catch (e) {} }
+saveD(); keepAwake(); dirty = true; syncSelBar(); renderDraw();
+};
+bSet.onclick = () => { form.hidden = !form.hidden; };
+bDel.onclick = () => { drawings = drawings.filter(x => x !== d); if (selId === d.id) setSelected(null); saveD(); keepAwake(); dirty = true; renderDraw(); };
+row.append(head, form); list.append(row);
+});
+}
+
+/* ===== 알람 ===== */
+let ac, wl, prevPx = null, lastChk = Date.now();
+function unlock() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch (e) {} }
+document.addEventListener("pointerdown", unlock, { once: true });
+function beep() {
+if (!ac) return;
+[0, 0.35, 0.7].forEach(t => {
+const o = ac.createOscillator(), gn = ac.createGain(), s = ac.currentTime + t;
+o.frequency.value = 880; o.connect(gn); gn.connect(ac.destination);
+gn.gain.setValueAtTime(0.25, s); gn.gain.exponentialRampToValueAtTime(0.001, s + 0.25); o.start(s); o.stop(s + 0.3);
+});
+}
+async function keepAwake() {
+try {
+if (drawings.some(d => d.alarm)) { if (!wl) { wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release", () => { wl = null; }); } }
+else if (wl) { wl.release(); wl = null; }
+} catch (e) {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepAwake(); });
+function fire(d, msg) {
+d.alarm = false; saveD(); dirty = true; keepAwake(); syncSelBar();
+const t = $("toast"); t.textContent = "🔔 " + msg + " (탭하면 닫혀요)"; t.hidden = false;
+beep();
+try { navigator.vibrate && navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) {}
+try { if (window.Notification && Notification.permission === "granted") new Notification("OKX BTC 알람", { body: msg }); } catch (e) {}
+if (!$("dsheet").hidden) renderDraw();
+}
+$("toast").onclick = () => { $("toast").hidden = true; };
+function levels(d, now) {
+const q = d.pts, P = i => q[i].p;
+switch (d.type) {
+case "hline": return [{ p: P(0) }];
+case "trend": case "ray": { const dt = q[1].t - q[0].t; return [{ p: dt ? P(0) + (P(1) - P(0)) * (now - q[0].t) / dt : P(0) }]; }
+case "fib": return FIB.map(v => ({ p: P(1) - (P(1) - P(0)) * v, n: v + " 레벨" }));
+case "long": case "short": return [{ p: P(0), n: "진입가" }, { p: P(1), n: "익절가" }, { p: d.sl, n: "손절가" }];
+default: return [{ p: P(0) }, { p: P(1) }];
+}
+}
+function chk() {
+if (!data.length) return;
+const cur = data[data.length - 1].c, now = Date.now();
+if (prevPx == null) prevPx = cur;
+drawings.filter(d => d.alarm).forEach(d => {
+if (d.type === "vline") { if (lastChk < d.pts[0].t && d.pts[0].t <= now) fire(d, "수직선 시간이 됐어요"); return; }
+for (const lv of levels(d, now)) {
+if ((prevPx - lv.p) * (cur - lv.p) <= 0) { fire(d, `${TOOLS[d.type].name}${lv.n ? " " + lv.n : ""}에 닿았어요 (${fmt(lv.p)})`); break; }
+}
+});
+prevPx = cur; lastChk = now;
+}
+setInterval(chk, 1000);
+
+
+/* ===== BB + MSB-OB 백테스트 ===== */
+function calcMsbSignals(len, fib, bravoMode, fib05Mode) {
+const n = data.length, H = data.map(d => d.h), Lo = data.map(d => d.l), C = data.map(d => d.c);
+const hs = [], ls = [], sigs = [];
+let trend = 1, lastUp = -1, lastDn = -1, eqL = -1, eqH = -1, market = 1, lL0, lH0;
+for (let i = len - 1; i < n; i++) {
+let hh = -Infinity, ll = Infinity;
+for (let k = i - len + 1; k <= i; k++) { hh = Math.max(hh, H[k]); ll = Math.min(ll, Lo[k]); }
+const up = H[i] >= hh, dn = Lo[i] <= ll, old = trend;
+trend = trend === 1 && dn ? -1 : trend === -1 && up ? 1 : trend;
+let s = lastUp < 0 ? 1 : i - 1 - lastUp; if (s <= 0) s = 1;
+let lv = Infinity; for (let k = Math.max(0, i - s + 1); k <= i; k++) lv = Math.min(lv, Lo[k]); if (lv === Lo[i]) eqL = i;
+let s2 = lastDn < 0 ? 1 : i - 1 - lastDn; if (s2 <= 0) s2 = 1;
+let hv = -Infinity; for (let k = Math.max(0, i - s2 + 1); k <= i; k++) hv = Math.max(hv, H[k]); if (hv === H[i]) eqH = i;
+if (up) lastUp = i; if (dn) lastDn = i;
+if (trend !== old) { if (trend === 1) ls.push({ v: lv, i: eqL }); else hs.push({ v: hv, i: eqH }); }
+if (hs.length < 2 || ls.length < 2) continue;
+const h0 = hs[hs.length - 1], h1 = hs[hs.length - 2], l0 = ls[ls.length - 1], l1 = ls[ls.length - 2];
+if (lL0 === l0.v || lH0 === h0.v) continue;
+let nm = market;
+if (market === 1 && l0.v < l1.v && l0.v < l1.v - Math.abs(h0.v - l1.v) * fib) nm = -1;
+else if (market === -1 && h0.v > h1.v && h0.v > h1.v + Math.abs(h1.v - l0.v) * fib) nm = 1;
+if (nm === market) continue;
+market = nm; lL0 = l0.v; lH0 = h0.v;
+if (market === 1) {
+if (!bravoMode || l0.v < l1.v) {
+if (fib05Mode) {
+sigs[i] = { dir: "long", sl: l0.v, limit: (l0.v + h0.v) / 2, inv: l0.v };
+} else {
+let trig = i;
+for (let k = Math.max(h1.i + 1, l0.i); k <= h0.i; k++) { if (C[k] > h1.v) { trig = k; break; } }
+if (trig === i) for (let k = Math.max(h1.i + 1, l0.i); k <= h0.i; k++) { if (H[k] > h1.v) { trig = k; break; } }
+sigs[trig] = { dir: "long", sl: l0.v };
+}
+}
+} else {
+if (!bravoMode || h0.v > h1.v) {
+if (fib05Mode) {
+sigs[i] = { dir: "short", sl: h0.v, limit: (h0.v + l0.v) / 2, inv: h0.v };
+} else {
+let trig = i;
+for (let k = Math.max(l1.i + 1, h0.i); k <= l0.i; k++) { if (C[k] < l1.v) { trig = k; break; } }
+if (trig === i) for (let k = Math.max(l1.i + 1, h0.i); k <= l0.i; k++) { if (Lo[k] < l1.v) { trig = k; break; } }
+sigs[trig] = { dir: "short", sl: h0.v };
+}
+}
+}
+}
+return sigs;
+}
+
+function runBacktest() {
+const bbLen = Math.max(10, Math.min(500, Number($("btBbLen").value) || 300));
+const bbMult = Math.max(0.5, Math.min(5, Number($("btBbMult").value) || 2));
+const msbLen = Math.max(2, Math.min(100, Number($("btMsbLen").value) || 9));
+const fib = Math.max(0, Math.min(1, Number($("btFib").value) || 0.33));
+const rrRaw = $("btRR").value;
+const isPctBe = rrRaw === "pct_2_1_be";
+const isPct21 = rrRaw === "pct_2_1" || isPctBe;
+const rr = isPct21 ? 0.5 : (Number(rrRaw) || 0.5);
+const sideFilter = $("btSide").value;
+const feePct = Math.max(0, Number($("btFee").value) || 0) / 100;
+
+if (data.length <= bbLen + 5) {
+$("btInfo").textContent = `데이터가 ${data.length}봉이라 BB(${bbLen}) 계산에 부족합니다. 상단 버튼을 눌러 과거 데이터를 더 불러와 주세요.`;
+return;
+}
+
+const [mid, up, lo] = bbArr(closes(), bbLen, bbMult);
+const modeVal = $("btMode").value;
+const bravoMode = modeVal === "bravo" || modeVal === "bravo_fib";
+const fib05Mode = modeVal === "bravo_fib";
+const sigs = calcMsbSignals(msbLen, fib, bravoMode, fib05Mode);
+const trades = [];
+let bullArm = false, bearArm = false;
+let pos = null, pendOrd = null;
+
+for (let i = bbLen - 1; i < data.length - 1; i++) {
+const d = data[i];
+if (pos) {
+if (pos.dir === "long") {
+if (d.l <= pos.sl) {
+pos.exitIdx = i;
+if (pos.halfDone) { pos.exitPx = (pos.halfTp + pos.sl) / 2; pos.res = "win"; pos.beExit = true; }
+else { pos.exitPx = pos.sl; pos.res = "loss"; }
+trades.push(pos); pos = null;
+} else {
+if (pos.be && !pos.halfDone && d.h >= pos.halfTp) { pos.halfDone = true; pos.sl = pos.entry; }
+if (d.h >= pos.tp) {
+pos.exitIdx = i;
+pos.exitPx = pos.be ? (pos.halfTp + pos.tp) / 2 : pos.tp;
+pos.res = "win"; trades.push(pos); pos = null;
+}
+}
+} else {
+if (d.h >= pos.sl) {
+pos.exitIdx = i;
+if (pos.halfDone) { pos.exitPx = (pos.halfTp + pos.sl) / 2; pos.res = "win"; pos.beExit = true; }
+else { pos.exitPx = pos.sl; pos.res = "loss"; }
+trades.push(pos); pos = null;
+} else {
+if (pos.be && !pos.halfDone && d.l <= pos.halfTp) { pos.halfDone = true; pos.sl = pos.entry; }
+if (d.l <= pos.tp) {
+pos.exitIdx = i;
+pos.exitPx = pos.be ? (pos.halfTp + pos.tp) / 2 : pos.tp;
+pos.res = "win"; trades.push(pos); pos = null;
+}
+}
+}
+}
+
+if (!pos && pendOrd) {
+if (pendOrd.dir === "long") {
+if (d.l <= pendOrd.inv) { pendOrd = null; }
+else if (d.l <= pendOrd.limit) {
+const entry = Math.min(d.o, pendOrd.limit);
+const sl = isPct21 ? entry * 0.98 : pendOrd.sl;
+const tp = isPct21 ? entry * 1.01 : entry + (entry - sl) * rr;
+const risk = entry - sl;
+if (risk > 0) pos = { dir: "long", idx: i, t: d.t, entry, sl, tp, risk, be: isPctBe, halfDone: false, halfTp: entry * 1.005 };
+pendOrd = null;
+}
+} else {
+if (d.h >= pendOrd.inv) { pendOrd = null; }
+else if (d.h >= pendOrd.limit) {
+const entry = Math.max(d.o, pendOrd.limit);
+const sl = isPct21 ? entry * 1.02 : pendOrd.sl;
+const tp = isPct21 ? entry * 0.99 : entry - (sl - entry) * rr;
+const risk = sl - entry;
+if (risk > 0) pos = { dir: "short", idx: i, t: d.t, entry, sl, tp, risk, be: isPctBe, halfDone: false, halfTp: entry * 0.995 };
+pendOrd = null;
+}
+}
+}
+
+const bodyTop = Math.max(d.o, d.c), bodyBot = Math.min(d.o, d.c);
+if (lo[i] != null && bodyBot < lo[i]) { bullArm = true; bearArm = false; }
+if (up[i] != null && bodyTop > up[i]) { bearArm = true; bullArm = false; }
+
+const sg = sigs[i];
+if (!sg) continue;
+if (sg.dir === "long") {
+const notOverbought = up[i] == null || bodyTop < up[i];
+if (!pos && bullArm && notOverbought && (sideFilter === "all" || sideFilter === "long")) {
+if (fib05Mode) {
+pendOrd = { dir: "long", limit: sg.limit, sl: sg.sl, inv: sg.inv };
+} else {
+const entry = d.c;
+const sl = isPct21 ? entry * 0.98 : sg.sl;
+const tp = isPct21 ? entry * 1.01 : entry + (entry - sl) * rr;
+const risk = entry - sl;
+if (risk > 0) pos = { dir: "long", idx: i, t: d.t, entry, sl, tp, risk, be: isPctBe, halfDone: false, halfTp: entry * 1.005 };
+}
+} else if (pendOrd && pendOrd.dir === "short") { pendOrd = null; }
+bullArm = false;
+} else {
+const notOversold = lo[i] == null || bodyBot > lo[i];
+if (!pos && bearArm && notOversold && (sideFilter === "all" || sideFilter === "short")) {
+if (fib05Mode) {
+pendOrd = { dir: "short", limit: sg.limit, sl: sg.sl, inv: sg.inv };
+} else {
+const entry = d.c;
+const sl = isPct21 ? entry * 1.02 : sg.sl;
+const tp = isPct21 ? entry * 0.99 : entry - (sl - entry) * rr;
+const risk = sl - entry;
+if (risk > 0) pos = { dir: "short", idx: i, t: d.t, entry, sl, tp, risk, be: isPctBe, halfDone: false, halfTp: entry * 0.995 };
+}
+} else if (pendOrd && pendOrd.dir === "long") { pendOrd = null; }
+bearArm = false;
+}
+}
+if (pos) { pos.res = "open"; pos.exitPx = data[data.length - 1].c; trades.push(pos); }
+
+const closed = trades.filter(t => t.res !== "open");
+const wins = closed.filter(t => t.res === "win").length;
+const losses = closed.filter(t => t.res === "loss").length;
+const wr = closed.length ? (wins / closed.length * 100) : 0;
+const beWr = (1 / (1 + rr)) * 100;
+
+const szMode = $("btSize").value;
+const rmSizes = szMode === "rm_5" ? [0.05, 0.025, 0.01] : [0.10, 0.05, 0.025, 0.01];
+let eqR = 0, peakR = 0, mddR = 0, sumPct = 0;
+let seed = 1000, peakSeed = 1000, mddSeed = 0, lossStreak = 0;
+closed.forEach(t => {
+const grossPct = t.dir === "long" ? (t.exitPx - t.entry) / t.entry : (t.entry - t.exitPx) / t.entry;
+const rawR = (grossPct * t.entry) / t.risk;
+const feeR = (feePct * t.entry) / t.risk;
+const netR = rawR - feeR;
+eqR += netR;
+if (eqR > peakR) peakR = eqR;
+if (peakR - eqR > mddR) mddR = peakR - eqR;
+const pct = grossPct - feePct;
+sumPct += pct * 100;
+t.netR = netR;
+t.netPct = pct * 100;
+const m = szMode.startsWith("rm_") ? rmSizes[Math.min(lossStreak, rmSizes.length - 1)] : (Number(szMode.split("_")[1]) || 3) / 100;
+seed = Math.max(0, seed * (1 + pct * (m * 100)));
+if (seed > peakSeed) peakSeed = seed;
+const dd = peakSeed > 0 ? (peakSeed - seed) / peakSeed * 100 : 0;
+if (dd > mddSeed) mddSeed = dd;
+lossStreak = t.res === "win" ? 0 : lossStreak + 1;
+});
+const seedRoi = (seed / 1000 - 1) * 100;
+
+const tfName = (TFS.find(x => x[0] === bar) || [bar, bar])[1];
+const startStr = new Date(data[bbLen - 1].t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+$("btInfo").textContent = `${tfName} · 유효 구간 ${data.length - bbLen}봉 (${startStr} ~ 현재, 전체 ${data.length}봉 로드됨)`;
+
+const kpi = $("btKpi");
+kpi.innerHTML = `
+<div class="bt-kpi"><div class="k">총 거래 (승 / 패)</div><div class="v">${closed.length}회 <span style="font-size:13px;font-weight:500;color:#a8adb8">(${wins}승 ${losses}패)</span></div></div>
+<div class="bt-kpi"><div class="k">승률 (손익분기 ${beWr.toFixed(1)}%)</div><div class="v ${wr >= beWr ? "pos" : "neg"}">${wr.toFixed(1)}%</div></div>
+<div class="bt-kpi"><div class="k">$1,000 복리 잔고</div><div class="v ${seed >= 1000 ? "pos" : "neg"}">$${seed.toLocaleString("en-US", {maximumFractionDigits:0})} <span style="font-size:12px">(${seedRoi >= 0 ? "+" : ""}${seedRoi.toFixed(1)}%)</span></div></div>
+<div class="bt-kpi"><div class="k">누적 손익 / 시드 MDD</div><div class="v ${eqR >= 0 ? "pos" : "neg"}">${eqR >= 0 ? "+" : ""}${eqR.toFixed(1)}R <span style="font-size:12px;color:#ff7a70">(-${mddSeed.toFixed(1)}%)</span></div></div>
+`;
+
+const list = $("btList"); list.textContent = "";
+$("btListH").hidden = !trades.length;
+if (!trades.length) {
+const p = el("p", "empty"); p.textContent = "해당 구간에서 조건에 맞는 진입 신호가 없었습니다."; list.append(p);
+return;
+}
+trades.slice().reverse().forEach(t => {
+const row = el("div", "bt-item");
+const dt = new Date(t.t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const dirTxt = t.dir === "long" ? "롱" : "숏";
+const bCls = t.res === "win" ? "win" : t.res === "loss" ? "loss" : "open";
+const bTxt = t.res === "win" ? `${t.beExit ? "본절" : "익절"} +${t.netR.toFixed(2)}R` : t.res === "loss" ? `손절 ${t.netR.toFixed(2)}R` : "보유중";
+row.innerHTML = `<div><b>${dirTxt}</b> · ${dt}<br><span style="color:#a8adb8">진입 ${fmt(t.entry)} · SL ${fmt(t.sl)} · TP ${fmt(t.tp)}</span></div><span class="bt-badge ${bCls}">${bTxt}</span>`;
+row.onclick = () => {
+closeSheet();
+chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, t.idx - 40), to: Math.min(data.length + 4, t.idx + 30) });
+};
+list.append(row);
+});
+}
+
+async function ensureBarsAndRun() {
+const target = Number($("btBars").value) || 1200;
+const btn = $("btRun");
+btn.disabled = true;
+const my = token;
+try {
+const chunks = [];
+let oldest = data[0].t, curLen = data.length;
+while (curLen < target && !noMore && my === token) {
+const pct = Math.min(100, Math.round(curLen / target * 100));
+btn.textContent = `과거 데이터 불러오는 중... (${curLen.toLocaleString()}/${target.toLocaleString()}봉 · ${pct}%)`;
+let rows = null;
+for (let tries = 0; tries < 5; tries++) {
+try { rows = await getJSON(`${REST}history-candles?instId=${inst}&bar=${bar}&after=${oldest}&limit=100`); break; }
+catch (err) { if (tries === 4) throw err; await new Promise(r => setTimeout(r, 1200)); }
+}
+if (my !== token) return;
+if (!rows || !rows.length) { noMore = true; break; }
+const older = rows.map(parse).reverse();
+oldest = older[0].t;
+chunks.unshift(older);
+curLen += older.length;
+await new Promise(r => setTimeout(r, 75));
+}
+if (chunks.length && my === token) {
+data = [].concat(...chunks, data);
+}
+if (my === token) render();
+} catch (e) {
+$("btInfo").textContent = "과거 데이터를 불러오는 중 오류가 발생했습니다: " + e.message;
+} finally {
+btn.disabled = false;
+btn.textContent = "과거 데이터 불러와서 백테스트 실행";
+}
+runBacktest();
+}
+
+$("btBtn").onclick = () => {
+$("backdrop").hidden = false; $("bsheet").hidden = false;
+$("sheet").hidden = true; $("dsheet").hidden = true;
+runBacktest();
+};
+$("closeB").onclick = closeSheet;
+$("btRun").onclick = ensureBarsAndRun;
+["btSide", "btBbLen", "btBbMult", "btMsbLen", "btRR", "btFib", "btFee", "btSize", "btMode"].forEach(id => {
+$(id).addEventListener("change", runBacktest);
+});
+
+
+/* ===== 날짜 검색기 ===== */
+function findNearestIdx(targetMs) {
+let best = 0, diff = Infinity;
+for (let i = 0; i < data.length; i++) {
+const d = Math.abs(data[i].t - targetMs);
+if (d < diff) { diff = d; best = i; }
+}
+return best;
+}
+
+function jumpToIdx(idx) {
+const from = Math.max(0, idx - 45), to = Math.min(data.length + 4, idx + 45);
+chart.timeScale().setVisibleLogicalRange({ from, to });
+}
+
+$("dateBtn").onclick = () => {
+$("backdrop").hidden = false; $("dateSheet").hidden = false;
+$("sheet").hidden = true; $("dsheet").hidden = true; $("bsheet").hidden = true;
+if (!$("dateInput").value) {
+const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+$("dateInput").value = now.toISOString().slice(0, 16);
+}
+};
+$("closeDate").onclick = closeSheet;
+$("backLive").onclick = () => { load(); };
+
+$("dateGo").onclick = async () => {
+$("dateInput").blur();
+const val = $("dateInput").value;
+if (!val) return;
+const targetMs = new Date(val).getTime();
+if (!isFinite(targetMs)) return;
+
+if (data.length && targetMs >= data[0].t && targetMs <= data[data.length - 1].t + bms()) {
+const idx = findNearestIdx(targetMs);
+closeSheet();
+jumpToIdx(idx);
+return;
+}
+
+const btn = $("dateGo");
+btn.disabled = true; btn.textContent = "차트 불러오는 중...";
+const my = ++token;
+try {
+let cursor = targetMs + 150 * bms();
+const chunks = [];
+for (let k = 0; k < 3; k++) {
+const rows = await getJSON(`${REST}history-candles?instId=${inst}&bar=${bar}&after=${cursor}&limit=100`);
+if (my !== token) return;
+if (!rows || !rows.length) break;
+const part = rows.map(parse).reverse();
+cursor = part[0].t;
+chunks.unshift(part);
+}
+if (!chunks.length) {
+btn.textContent = "해당 날짜 데이터가 없습니다";
+setTimeout(() => { btn.textContent = "해당 날짜로 이동"; btn.disabled = false; }, 1500);
+return;
+}
+data = [].concat(...chunks);
+noMore = false;
+noNewer = false;
+isPastView = true;
+$("pastBar").hidden = false;
+setStatus(false, "과거 조회");
+render();
+const idx = findNearestIdx(targetMs);
+closeSheet();
+chart.applyOptions({ handleScroll: true, handleScale: true });
+jumpToIdx(idx);
+} catch (e) {
+btn.textContent = "불러오기 실패: " + e.message;
+setTimeout(() => { btn.textContent = "해당 날짜로 이동"; }, 2000);
+} finally {
+btn.disabled = false;
+if (btn.textContent === "차트 불러오는 중...") btn.textContent = "해당 날짜로 이동";
+}
+};
+
+size(); mark(); rebuild(); load(); keepAwake();
+</script>
+</body>
+</html>
