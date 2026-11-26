@@ -1249,14 +1249,16 @@ pendOrd = null;
 }
 
 const bodyTop = Math.max(d.o, d.c), bodyBot = Math.min(d.o, d.c);
+if (mid[i] != null && d.c > mid[i]) { bullArm = false; }
+if (mid[i] != null && d.c < mid[i]) { bearArm = false; }
 if (lo[i] != null && bodyBot < lo[i]) { bullArm = true; bearArm = false; }
 if (up[i] != null && bodyTop > up[i]) { bearArm = true; bullArm = false; }
 
 const sg = sigs[i];
 if (!sg) continue;
 if (sg.dir === "long") {
-const notOverbought = up[i] == null || bodyTop < up[i];
-if (!pos && bullArm && notOverbought && (sideFilter === "all" || sideFilter === "long")) {
+const inDiscount = mid[i] != null && d.c < mid[i];
+if (!pos && bullArm && inDiscount && (sideFilter === "all" || sideFilter === "long")) {
 if (fib05Mode) {
 pendOrd = { dir: "long", limit: sg.limit, sl: sg.sl, inv: sg.inv };
 } else {
@@ -1269,8 +1271,8 @@ if (risk > 0) pos = { dir: "long", idx: i, t: d.t, entry, sl, tp, risk, be: isPc
 } else if (pendOrd && pendOrd.dir === "short") { pendOrd = null; }
 bullArm = false;
 } else {
-const notOversold = lo[i] == null || bodyBot > lo[i];
-if (!pos && bearArm && notOversold && (sideFilter === "all" || sideFilter === "short")) {
+const inPremium = mid[i] != null && d.c > mid[i];
+if (!pos && bearArm && inPremium && (sideFilter === "all" || sideFilter === "short")) {
 if (fib05Mode) {
 pendOrd = { dir: "short", limit: sg.limit, sl: sg.sl, inv: sg.inv };
 } else {
